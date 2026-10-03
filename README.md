@@ -25,7 +25,7 @@ We will use the following four related datasets:
    https://data.cms.gov/provider-data/dataset/r5ix-sfxw
 
 4. **Survey Summary**  
-   [[https://data.cms.gov/provider-data/dataset/ifjz-ge4w](https://data.cms.gov/provider-data/dataset/tbry-pc2d)](https://data.cms.gov/provider-data/dataset/tbry-pc2d)
+   https://data.cms.gov/provider-data/dataset/tbry-pc2d
 
 ## Project Goal
 TBD

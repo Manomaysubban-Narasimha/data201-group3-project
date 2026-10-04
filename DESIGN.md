@@ -1,3 +1,3 @@
 ##steps:
 1. Understanding
-2.
+2. Plan

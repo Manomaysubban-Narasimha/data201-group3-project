@@ -1,4 +1,4 @@
-# DATA 201 Group 3 Project
+<!-- # DATA 201 Group 3 Project -->
 
 San Jose State University  
 Fall 2026
@@ -34,8 +34,8 @@ TBD
 ## Steps
 1. Dataset Selection 
 2. Understanding dataset
-3. ER
-4. Normalization
+3. ER/EER diagram
+4. Normalization to 3NF
 5. DDL and Data Insertion
 6. Queries
 7. Presentation
@@ -53,3 +53,5 @@ git add file1 file2           # 3. add only your files (avoid "git add .")
 git commit -m "What I changed"   # 4. commit
 git pull                      # 5. get any new teammate changes
 git push                      # 6. share your work
+
+## slides prepartion

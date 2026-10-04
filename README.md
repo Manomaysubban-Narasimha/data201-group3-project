@@ -24,3 +24,13 @@ Period: 2018–2022
 
 ## Project Goal
 TBD
+
+## Steps
+1. Dataset Selection 
+2. Understanding dataset
+3. ER
+4. Normalization
+5. DDL and Data Insertion
+6. Queries
+7. Presentation
+

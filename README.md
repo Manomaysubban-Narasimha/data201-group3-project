@@ -11,21 +11,16 @@ Fall 2026
 
 ## Dataset Source
 
-**U.S. Centers for Medicare & Medicaid Services (CMS)**
+Group 3
 
-We will use the following four related datasets:
+Dataset: Open e-commerce 1.0: Five years of crowdsourced U.S. Amazon purchase histories with user demographics
+Source: Harvard Dataverse (CC0 public domain license)
 
-1. **Provider Information**  
-   https://data.cms.gov/provider-data/dataset/4pq5-n9py
+Dataset link: https://doi.org/10.7910/DVN/YGLYDYLinks to an external site. 
+Paper: https://doi.org/10.1038/s41597-024-03329-6Links to an external site. 
 
-2. **MDS Quality Measures**  
-   https://data.cms.gov/provider-data/dataset/djen-97ju
-
-3. **Health Deficiencies**  
-   https://data.cms.gov/provider-data/dataset/r5ix-sfxw
-
-4. **Survey Summary**  
-   https://data.cms.gov/provider-data/dataset/tbry-pc2d
+Tables: amazon-purchases.csv (1,850,717 rows), survey.csv (5,027 rows), linked by Survey ResponseID
+Period: 2018–2022
 
 ## Project Goal
 TBD

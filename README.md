@@ -40,3 +40,16 @@ TBD
 6. Queries
 7. Presentation
 
+## Github Guide
+## First time
+git config --global pull.rebase true
+git config --global rebase.autoStash true
+
+## Every commit
+git pull                      # 1. get the latest
+# ... do your work ...
+git status                    # 2. see what changed
+git add file1 file2           # 3. add only your files (avoid "git add .")
+git commit -m "What I changed"   # 4. commit
+git pull                      # 5. get any new teammate changes
+git push                      # 6. share your work

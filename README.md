@@ -25,6 +25,9 @@ Fall 2026
 The tables are linked by `Survey ResponseID`.  
 **Period:** 2018–2022
 
+## Mid-Project Presentation Link
+https://docs.google.com/presentation/d/1xdit__9CUikImNtztxCeRcT1ZUJxbLQDneEiSmSHSyM/edit?slide=id.h37ed3da09027b5ac_0_125#slide=id.h37ed3da09027b5ac_0_125 
+
 ## Project Goal
 TBD
 

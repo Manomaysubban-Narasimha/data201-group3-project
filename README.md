@@ -11,16 +11,19 @@ Fall 2026
 
 ## Dataset Source
 
-Group 3
+**Group 3**
 
-Dataset: Open e-commerce 1.0: Five years of crowdsourced U.S. Amazon purchase histories with user demographics
-Source: Harvard Dataverse (CC0 public domain license)
+**Dataset:** Open e-commerce 1.0: Five years of crowdsourced U.S. Amazon purchase histories with user demographics  
+**Source:** [Harvard Dataverse](https://doi.org/10.7910/DVN/YGLYDY) (CC0 public domain license)  
+**Paper:** [Berke, Calacci, et al., *Scientific Data* (2024)](https://doi.org/10.1038/s41597-024-03329-6)
 
-Dataset link: https://doi.org/10.7910/DVN/YGLYDYLinks to an external site. 
-Paper: https://doi.org/10.1038/s41597-024-03329-6Links to an external site. 
+| Table | Rows |
+| --- | ---: |
+| `amazon-purchases.csv` | 1,850,717 |
+| `survey.csv` | 5,027 |
 
-Tables: amazon-purchases.csv (1,850,717 rows), survey.csv (5,027 rows), linked by Survey ResponseID
-Period: 2018–2022
+The tables are linked by `Survey ResponseID`.  
+**Period:** 2018–2022
 
 ## Project Goal
 TBD

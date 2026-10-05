@@ -32,10 +32,11 @@ https://docs.google.com/presentation/d/1xdit__9CUikImNtztxCeRcT1ZUJxbLQDneEiSmSH
 TBD
 
 ## Steps
-1. Dataset Selection 
-2. Understanding dataset
-3. ER/EER diagram
-4. Normalization to 3NF
+1. Dataset Selection - Done
+2. Understanding dataset - Done
+3. ER/EER diagram - Done
+4. Normalization to 3NF - Done
+5. Documentation - In Progress
 5. DDL and Data Insertion
 6. Queries
 7. Presentation
@@ -54,4 +55,3 @@ git commit -m "What I changed"   # 4. commit
 git pull                      # 5. get any new teammate changes
 git push                      # 6. share your work
 
-## slides prepartion

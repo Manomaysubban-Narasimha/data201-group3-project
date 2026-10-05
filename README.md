@@ -34,7 +34,7 @@ TBD
 ## Steps
 1. Dataset Selection - Done
 2. Understanding dataset - Done
-3. ER/EER diagram - Done
+3. ER/EER diagram - Done - https://drive.google.com/file/d/19VbYl2XTWtWEDNvoZBGTug6klbM_-23z/view?usp=sharing Kindly access using this link and make required changes and replace in assets/ folder with latest version
 4. Normalization to 3NF - Done
 5. Documentation - In Progress
 5. DDL and Data Insertion

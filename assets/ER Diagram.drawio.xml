@@ -1,10 +1,10 @@
 <mxfile host="app.diagrams.net">
   <diagram id="Lb3mwLpC4hNzknMgSt26" name="Page-1">
-    <mxGraphModel dx="1762" dy="1387" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1200" math="0" shadow="0">
+    <mxGraphModel dx="1297" dy="1021" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1200" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="Amazon purchase histories (Open e-commerce 1.0): conceptual ER model, Chen notation" vertex="1">
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="Amazon Purchase Data: Conceptual ER model, Chen Notation" vertex="1">
           <mxGeometry height="35" width="1400" x="35" y="18" as="geometry" />
         </mxCell>
         <mxCell id="9ZCBWydnw6ap3msArCPP-9" edge="1" parent="1" source="customer" style="edgeStyle=orthogonalEdgeStyle;shape=link;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;">

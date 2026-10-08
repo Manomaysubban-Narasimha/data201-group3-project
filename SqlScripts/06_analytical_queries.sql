@@ -1,7 +1,7 @@
 -- STEP 6 - Analytical queries: analyze the normalized data
 
 
-USE amazon_ecommerce;   -- the database from step 1: if you renamed it there, use the same name here
+USE amazon_ecommerce;   
 
 -- ---------------------------------------------------------------------
 -- Sales over time
@@ -16,7 +16,8 @@ SELECT YEAR(order_date)                      AS order_year,
        COUNT(DISTINCT response_id)           AS active_customers,
        ROUND(SUM(unit_price * quantity) / COUNT(DISTINCT response_id)
              / COUNT(DISTINCT MONTH(order_date)), 2) AS monthly_spend_per_active_customer
-FROM v_study_purchase
+FROM purchase_line
+WHERE order_date BETWEEN '2018-01-01' AND '2022-10-31'
 GROUP BY YEAR(order_date)
 ORDER BY order_year;
 
@@ -26,17 +27,19 @@ SELECT MONTH(order_date)                     AS month_no,
        COUNT(DISTINCT YEAR(order_date))      AS years_in_data,   -- November and December: 2018-2021 only
        ROUND(SUM(unit_price * quantity) / COUNT(DISTINCT YEAR(order_date)), 2) AS avg_spend_per_year_usd,
        ROUND(AVG(unit_price), 2)             AS avg_unit_price
-FROM v_study_purchase
+FROM purchase_line
+WHERE order_date BETWEEN '2018-01-01' AND '2022-10-31'
 GROUP BY MONTH(order_date)
 ORDER BY avg_spend_per_year_usd DESC;
 
--- @Q03 | M1 | Advanced | CTE + self-join + correlated subquery |
+-- @Q03 | Advanced | CTE + self-join + correlated subquery |
 -- Comparing the same months (January to October) each year, how fast did spending grow?
 WITH jan_oct AS (                           
   SELECT YEAR(order_date) AS order_year,
          SUM(unit_price * quantity) AS spend
-  FROM v_study_purchase
-  WHERE MONTH(order_date) <= 10
+  FROM purchase_line
+  WHERE order_date BETWEEN '2018-01-01' AND '2022-10-31'
+  AND MONTH(order_date) <= 10
   GROUP BY YEAR(order_date)
 )
 SELECT cur.order_year,
@@ -54,7 +57,8 @@ WITH monthly AS (
   SELECT YEAR(order_date)  AS order_year,
          MONTH(order_date) AS order_month,
          SUM(unit_price * quantity) AS spend
-  FROM v_study_purchase
+  FROM purchase_line
+  WHERE order_date BETWEEN '2018-01-01' AND '2022-10-31'
   GROUP BY YEAR(order_date), MONTH(order_date)
 ),
 numbered AS (
@@ -77,7 +81,6 @@ SELECT order_year,
 FROM peaks
 ORDER BY order_year;
 
--------------------------------------------------------
 -- Products and categories analytics queries
 
 -- @Q05 | Basic | JOIN + GROUP BY + COALESCE + LIMIT | Which 10 product categories earn the most, and how many customers buy them?
@@ -86,8 +89,9 @@ SELECT COALESCE(p.category, 'UNKNOWN')         AS category,
        COUNT(DISTINCT pl.response_id)          AS customers,
        ROUND(SUM(pl.unit_price * pl.quantity), 2) AS spend_usd,
        ROUND(AVG(pl.unit_price), 2)            AS avg_unit_price
-FROM v_study_purchase pl
+FROM purchase_line pl
 JOIN product p ON p.asin = pl.asin
+WHERE pl.order_date BETWEEN '2018-01-01' AND '2022-10-31'
 GROUP BY COALESCE(p.category, 'UNKNOWN')
 ORDER BY spend_usd DESC
 LIMIT 10;
@@ -103,7 +107,8 @@ SELECT CASE
        COUNT(*)                              AS purchase_lines,
        SUM(quantity)                         AS units,
        ROUND(SUM(unit_price * quantity), 2)  AS spend_usd
-FROM v_study_purchase
+FROM purchase_line
+WHERE order_date BETWEEN '2018-01-01' AND '2022-10-31'
 GROUP BY price_band
 ORDER BY price_band;
 
@@ -112,10 +117,11 @@ WITH category_year AS (
   SELECT YEAR(pl.order_date) AS order_year,
          p.category,
          SUM(pl.unit_price * pl.quantity) AS spend
-  FROM v_study_purchase pl
+  FROM purchase_line pl
   JOIN product p ON p.asin = pl.asin
-  WHERE p.category IS NOT NULL                 -- unknown items are reported separately in Q05
-    AND p.category NOT LIKE '%GIFT_CARD%'      -- gift cards are money, not a product type
+  WHERE pl.order_date BETWEEN '2018-01-01' AND '2022-10-31'
+    AND p.category IS NOT NULL
+    AND p.category NOT LIKE '%GIFT_CARD%'
   GROUP BY YEAR(pl.order_date), p.category
 ),
 ranked AS (
@@ -138,7 +144,7 @@ WITH category_spend AS (
   SELECT COALESCE(p.category, 'UNKNOWN') AS category,
          SUM(CASE WHEN pl.order_date <  '2020-01-01' THEN pl.unit_price * pl.quantity ELSE 0 END) AS spend_2019,
          SUM(CASE WHEN pl.order_date >= '2020-01-01' THEN pl.unit_price * pl.quantity ELSE 0 END) AS spend_2020
-  FROM v_study_purchase pl
+  FROM purchase_line pl
   JOIN product p ON p.asin = pl.asin
   WHERE pl.order_date BETWEEN '2019-01-01' AND '2020-12-31'
   GROUP BY COALESCE(p.category, 'UNKNOWN')
@@ -166,7 +172,8 @@ SELECT c.income_bracket,
        -- 58 months in the study window; x 12 turns spend per month into spend per year
        ROUND(SUM(pl.unit_price * pl.quantity) / COUNT(DISTINCT c.response_id) / 58 * 12, 2) AS spend_per_customer_per_year
 FROM customer c
-JOIN v_study_purchase pl ON pl.response_id = c.response_id
+JOIN purchase_line pl ON pl.response_id = c.response_id
+WHERE pl.order_date BETWEEN '2018-01-01' AND '2022-10-31'
 GROUP BY c.income_bracket
 ORDER BY CASE c.income_bracket                  -- income order, not alphabetical order
            WHEN 'Less than $25,000'   THEN 1
@@ -186,7 +193,8 @@ SELECT c.order_frequency                       AS self_reported_frequency,
                                                AS actual_shopping_days_per_month,
        ROUND(SUM(pl.unit_price * pl.quantity) / COUNT(DISTINCT c.response_id) / 58 * 12, 2) AS spend_per_customer_per_year
 FROM customer c
-JOIN v_study_purchase pl ON pl.response_id = c.response_id
+JOIN purchase_line pl ON pl.response_id = c.response_id
+WHERE pl.order_date BETWEEN '2018-01-01' AND '2022-10-31'
 GROUP BY c.order_frequency
 ORDER BY CASE c.order_frequency
            WHEN 'Less than 5 times per month'  THEN 1
@@ -197,7 +205,8 @@ ORDER BY CASE c.order_frequency
 -- @Q11 | Manomay | Advanced | CTEs + correlated COUNT subquery + CASE | How concentrated is spending? What share comes from the top 10% of customers?
 WITH customer_spend AS (
   SELECT response_id, SUM(unit_price * quantity) AS spend
-  FROM v_study_purchase
+  FROM purchase_line
+  WHERE order_date BETWEEN '2018-01-01' AND '2022-10-31'
   GROUP BY response_id
 ),
 ranked AS (
@@ -228,7 +237,8 @@ ORDER BY customer_group;
 WITH customer_spend AS (
   SELECT c.response_id, c.age_group, SUM(pl.unit_price * pl.quantity) AS total_spend
   FROM customer c
-  JOIN v_study_purchase pl ON pl.response_id = c.response_id
+  JOIN purchase_line pl ON pl.response_id = c.response_id
+  WHERE pl.order_date BETWEEN '2018-01-01' AND '2022-10-31'
   GROUP BY c.response_id, c.age_group
 ),
 age_group_avg AS (
@@ -255,10 +265,11 @@ SELECT COALESCE(r.region_name,
        COUNT(*)                                AS purchase_lines,
        COUNT(DISTINCT pl.response_id)          AS customers,
        ROUND(SUM(pl.unit_price * pl.quantity), 2) AS spend_usd
-FROM v_study_purchase pl
+FROM purchase_line pl
 LEFT JOIN state s           ON s.state_code  = pl.ship_state_code   -- LEFT JOIN keeps unshipped lines
 LEFT JOIN census_division d ON d.division_id = s.division_id
 LEFT JOIN census_region r   ON r.region_id   = d.region_id
+WHERE pl.order_date BETWEEN '2018-01-01' AND '2022-10-31'
 GROUP BY ship_region
 ORDER BY spend_usd DESC;
 
@@ -268,11 +279,12 @@ SELECT CASE WHEN lc.response_id IS NULL THEN 'Did not move in 2021' ELSE 'Moved 
        COUNT(*)                      AS shipped_lines,
        ROUND(100 * AVG(CASE WHEN pl.ship_state_code <> c.state_code THEN 1 ELSE 0 END), 1)
                                      AS pct_shipped_outside_current_state
-FROM v_study_purchase pl
+FROM purchase_line pl
 JOIN customer c ON c.response_id = pl.response_id
 LEFT JOIN customer_life_change lc
        ON lc.response_id = c.response_id AND lc.life_change = 'Moved place of residence'
-WHERE pl.ship_state_code IS NOT NULL
+WHERE pl.order_date BETWEEN '2018-01-01' AND '2022-10-31'
+  AND pl.ship_state_code IS NOT NULL
   AND c.state_code IS NOT NULL                 -- two respondents live outside the US
 GROUP BY customer_group;
 
@@ -283,7 +295,8 @@ WITH repeats AS (            -- one row per customer and product bought on two o
          -- months from the first to the last purchase, counted by calendar month
          (YEAR(MAX(order_date)) * 12 + MONTH(MAX(order_date)))
            - (YEAR(MIN(order_date)) * 12 + MONTH(MIN(order_date))) AS months_first_to_last
-  FROM v_study_purchase
+  FROM purchase_line
+  WHERE order_date BETWEEN '2018-01-01' AND '2022-10-31'
   GROUP BY response_id, asin
   HAVING COUNT(DISTINCT order_date) >= 2
 )
@@ -306,8 +319,10 @@ WITH jan_oct AS (
          SUM(CASE WHEN order_date BETWEEN '2019-01-01' AND '2021-12-31' AND MONTH(order_date) <= 10
                   THEN unit_price * quantity ELSE 0 END) / 3                        AS avg_jan_oct_2019_2021,
          SUM(CASE WHEN order_date >= '2022-01-01' THEN unit_price * quantity ELSE 0 END) AS jan_oct_2022
-  FROM v_study_purchase                      -- the view ends on 31 October 2022
+  FROM purchase_line
+  WHERE order_date BETWEEN '2018-01-01' AND '2022-10-31'
   GROUP BY response_id
+
 ),
 flagged AS (
   SELECT j.avg_jan_oct_2019_2021, j.jan_oct_2022,

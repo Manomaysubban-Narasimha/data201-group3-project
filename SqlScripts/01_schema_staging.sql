@@ -1,6 +1,5 @@
--- =====================================================================
--- STEP 2 - Create the staging tables (run after ../sql/01_Schema.sql)
--- =====================================================================
+-- STEP 1 - Create the staging tables
+
 USE amazon_ecommerce;
 
 DROP TABLE IF EXISTS stg_census_codes, stg_census_areas, stg_census,

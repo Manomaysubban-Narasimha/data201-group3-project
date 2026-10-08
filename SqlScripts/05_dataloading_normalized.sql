@@ -1,13 +1,11 @@
--- =====================================================================
--- STEP 5 - Normalize: move the data from staging into the 8 final tables
--- =====================================================================
+-- STEP 5 - Dataloading: move the data from staging into the 8 final tables
 USE amazon_ecommerce;
 
--- ---------------------------------------------------------------------
+
 -- 5a. Census tables (3NF). stg_census repeats "Pacific, West" for every Pacific state:
 --     region depends on division, division on state (a transitive dependency).
 --     SELECT DISTINCT pulls each fact out once.
--- ---------------------------------------------------------------------
+
 INSERT INTO census_region (region_id, region_name)
 SELECT DISTINCT region_id, region_name
 FROM stg_census

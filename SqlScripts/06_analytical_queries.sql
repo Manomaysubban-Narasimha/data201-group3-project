@@ -1,3 +1,5 @@
+-- STEP 6 - Analytical queries: analyze the normalized data
+
 
 USE amazon_ecommerce;   -- the database from step 1: if you renamed it there, use the same name here
 

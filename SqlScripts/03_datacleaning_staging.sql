@@ -74,3 +74,21 @@ SELECT 'life change',
        (SELECT COUNT(*) FROM stg_survey_life_change),
        (SELECT SUM(LENGTH(life_change_list) - LENGTH(REPLACE(life_change_list, ',', '')) + 1)
         FROM stg_survey WHERE life_change_list IS NOT NULL);
+
+-- 3d. Census: one flat row per state with its division and region next to it.
+--     The areas file holds regions, divisions and states as different rows (SUMLEV),
+--     so the same table is joined three times, once per level (a self-join).
+INSERT INTO stg_census (state_code, state_name, division_id, division_name, region_id, region_name)
+SELECT c.state_code,
+       c.state_name,
+       CASE WHEN s.division = 'X' THEN NULL ELSE s.division END,   -- Puerto Rico: no Census division
+       d.name,
+       CASE WHEN s.region = 'X' THEN NULL ELSE s.region END,
+       REPLACE(r.name, ' Region', '')                               -- 'West Region' -> 'West'
+FROM stg_census_codes c
+JOIN stg_census_areas s      ON s.state_fips = c.state_fips AND s.sumlev = '040'   -- the state row
+LEFT JOIN stg_census_areas d ON d.division = s.division AND d.sumlev = '030'      -- its division row
+LEFT JOIN stg_census_areas r ON r.region = s.region AND r.sumlev = '020';         -- its region row
+
+-- Check: 52 states (50 + DC + Puerto Rico). the other territories have no population row
+SELECT COUNT(*) AS states, COUNT(division_id) AS with_division, COUNT(region_id) AS with_region FROM stg_census;

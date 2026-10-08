@@ -56,3 +56,11 @@ CREATE TABLE stg_survey (
   census_use          VARCHAR(100),
   research_use        VARCHAR(100)
 );
+
+-- Filled in step 4: one row per (respondent, answer)
+CREATE TABLE stg_survey_race (
+  response_id VARCHAR(20) CHARACTER SET ascii COLLATE ascii_bin, race VARCHAR(100)
+);
+CREATE TABLE stg_survey_life_change (
+  response_id VARCHAR(20) CHARACTER SET ascii COLLATE ascii_bin, life_change VARCHAR(100)
+);

@@ -4,7 +4,7 @@ San Jose State University
 Fall 2026
 
 ## Team Members
-- Kashif Ahmed
+- Kashif Ahmed Mohammed
 - Waqas Ahmed
 - Manomay Subban Narasimha
 - Mourya Arnepalli

@@ -247,3 +247,82 @@ SELECT a.age_group,
        ROUND(a.top_spend, 2) AS top_customer_usd
 FROM age_group_avg a
 ORDER BY a.age_group;
+
+-- @Q13 | Kashif | Basic | 4-table LEFT JOIN + COALESCE + CASE | Where do orders ship? Spend by Census region of the shipping address.
+SELECT COALESCE(r.region_name,
+                CASE WHEN pl.ship_state_code IS NULL THEN 'Not shipped (digital / gift card)'
+                     ELSE 'Puerto Rico (no Census region)' END) AS ship_region,
+       COUNT(*)                                AS purchase_lines,
+       COUNT(DISTINCT pl.response_id)          AS customers,
+       ROUND(SUM(pl.unit_price * pl.quantity), 2) AS spend_usd
+FROM v_study_purchase pl
+LEFT JOIN state s           ON s.state_code  = pl.ship_state_code   -- LEFT JOIN keeps unshipped lines
+LEFT JOIN census_division d ON d.division_id = s.division_id
+LEFT JOIN census_region r   ON r.region_id   = d.region_id
+GROUP BY ship_region
+ORDER BY spend_usd DESC;
+
+-- @Q14 | Kashif | Basic | JOIN + LEFT JOIN + CASE | Do customers who moved in 2021 ship outside their current state more often?
+SELECT CASE WHEN lc.response_id IS NULL THEN 'Did not move in 2021' ELSE 'Moved in 2021' END AS customer_group,
+       COUNT(DISTINCT c.response_id) AS customers,
+       COUNT(*)                      AS shipped_lines,
+       ROUND(100 * AVG(CASE WHEN pl.ship_state_code <> c.state_code THEN 1 ELSE 0 END), 1)
+                                     AS pct_shipped_outside_current_state
+FROM v_study_purchase pl
+JOIN customer c ON c.response_id = pl.response_id
+LEFT JOIN customer_life_change lc
+       ON lc.response_id = c.response_id AND lc.life_change = 'Moved place of residence'
+WHERE pl.ship_state_code IS NOT NULL
+  AND c.state_code IS NOT NULL                 -- two respondents live outside the US
+GROUP BY customer_group;
+
+-- @Q15 | Kashif | Advanced | CTE + GROUP BY/HAVING + JOIN | When customers rebuy the same product, how many months pass between purchases?
+WITH repeats AS (            -- one row per customer and product bought on two or more different days
+  SELECT response_id, asin,
+         COUNT(DISTINCT order_date) - 1 AS repeat_purchases,
+         -- months from the first to the last purchase, counted by calendar month
+         (YEAR(MAX(order_date)) * 12 + MONTH(MAX(order_date)))
+           - (YEAR(MIN(order_date)) * 12 + MONTH(MIN(order_date))) AS months_first_to_last
+  FROM v_study_purchase
+  GROUP BY response_id, asin
+  HAVING COUNT(DISTINCT order_date) >= 2
+)
+SELECT p.category,
+       COUNT(DISTINCT r.response_id) AS repeat_customers,
+       SUM(r.repeat_purchases)       AS repeat_purchases,
+       -- the gaps between purchases add up to first-to-last, so this is the average gap
+       ROUND(SUM(r.months_first_to_last) / SUM(r.repeat_purchases), 1) AS avg_months_between
+FROM repeats r
+JOIN product p ON p.asin = r.asin            -- aggregate first, then join (no fan-out)
+WHERE p.category IS NOT NULL
+GROUP BY p.category
+HAVING SUM(r.repeat_purchases) >= 100
+ORDER BY repeat_purchases DESC
+LIMIT 10;
+
+-- @Q16 | Kashif | Advanced | CTEs + CASE + EXISTS | Which customers are slipping? Share whose January-October 2022 spend fell by half or more versus the same months of 2019-2021.
+WITH jan_oct AS (
+  SELECT response_id,
+         SUM(CASE WHEN order_date BETWEEN '2019-01-01' AND '2021-12-31' AND MONTH(order_date) <= 10
+                  THEN unit_price * quantity ELSE 0 END) / 3                        AS avg_jan_oct_2019_2021,
+         SUM(CASE WHEN order_date >= '2022-01-01' THEN unit_price * quantity ELSE 0 END) AS jan_oct_2022
+  FROM v_study_purchase                      -- the view ends on 31 October 2022
+  GROUP BY response_id
+),
+flagged AS (
+  SELECT j.avg_jan_oct_2019_2021, j.jan_oct_2022,
+         CASE WHEN j.jan_oct_2022 <= 0.5 * j.avg_jan_oct_2019_2021 THEN 1 ELSE 0 END AS slipping,
+         CASE WHEN EXISTS (SELECT 1 FROM customer_life_change lc
+                           WHERE lc.response_id = j.response_id AND lc.life_change = 'Lost a job')
+              THEN 'Lost a job in 2021' ELSE 'No job loss reported' END AS customer_group
+  FROM jan_oct j
+  WHERE j.avg_jan_oct_2019_2021 > 0
+)
+SELECT customer_group,
+       COUNT(*)                          AS customers,
+       SUM(slipping)                     AS slipping_customers,
+       ROUND(100 * AVG(slipping), 1)     AS pct_slipping,
+       ROUND(AVG(avg_jan_oct_2019_2021), 2) AS avg_jan_oct_spend_2019_2021,
+       ROUND(AVG(jan_oct_2022), 2)       AS avg_jan_oct_spend_2022
+FROM flagged
+GROUP BY customer_group;

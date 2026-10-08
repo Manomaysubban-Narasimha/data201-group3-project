@@ -158,3 +158,92 @@ SELECT category,
 FROM shares
 ORDER BY share_change_pts DESC
 LIMIT 10;
+
+-- @Q09 | Manomay | Basic | JOIN + GROUP BY + ORDER BY CASE | How much does a customer spend per year in each income bracket?
+SELECT c.income_bracket,
+       COUNT(DISTINCT c.response_id)              AS customers,
+       ROUND(SUM(pl.unit_price * pl.quantity), 2) AS spend_usd,
+       -- 58 months in the study window; x 12 turns spend per month into spend per year
+       ROUND(SUM(pl.unit_price * pl.quantity) / COUNT(DISTINCT c.response_id) / 58 * 12, 2) AS spend_per_customer_per_year
+FROM customer c
+JOIN v_study_purchase pl ON pl.response_id = c.response_id
+GROUP BY c.income_bracket
+ORDER BY CASE c.income_bracket                  -- income order, not alphabetical order
+           WHEN 'Less than $25,000'   THEN 1
+           WHEN '$25,000 - $49,999'   THEN 2
+           WHEN '$50,000 - $74,999'   THEN 3
+           WHEN '$75,000 - $99,999'   THEN 4
+           WHEN '$100,000 - $149,999' THEN 5
+           WHEN '$150,000 or more'    THEN 6
+           ELSE 7
+         END;
+
+-- @Q10 | Manomay | Basic | JOIN + GROUP BY + COUNT(DISTINCT) | Do customers who say they order often really shop on more days?
+SELECT c.order_frequency                       AS self_reported_frequency,
+       COUNT(DISTINCT c.response_id)           AS customers,
+       -- COUNT(DISTINCT customer, day) counts shopping days: several items on one day count once
+       ROUND(COUNT(DISTINCT pl.response_id, pl.order_date) / COUNT(DISTINCT c.response_id) / 58, 2)
+                                               AS actual_shopping_days_per_month,
+       ROUND(SUM(pl.unit_price * pl.quantity) / COUNT(DISTINCT c.response_id) / 58 * 12, 2) AS spend_per_customer_per_year
+FROM customer c
+JOIN v_study_purchase pl ON pl.response_id = c.response_id
+GROUP BY c.order_frequency
+ORDER BY CASE c.order_frequency
+           WHEN 'Less than 5 times per month'  THEN 1
+           WHEN '5 - 10 times per month'       THEN 2
+           ELSE 3
+         END;
+
+-- @Q11 | Manomay | Advanced | CTEs + correlated COUNT subquery + CASE | How concentrated is spending? What share comes from the top 10% of customers?
+WITH customer_spend AS (
+  SELECT response_id, SUM(unit_price * quantity) AS spend
+  FROM v_study_purchase
+  GROUP BY response_id
+),
+ranked AS (
+  SELECT s.spend,
+         1 + (SELECT COUNT(*) FROM customer_spend s2 WHERE s2.spend > s.spend) AS spend_rank   -- 1 = biggest spender
+  FROM customer_spend s
+),
+grouped AS (
+  SELECT spend,
+         CASE WHEN spend_rank <= 0.1 * (SELECT COUNT(*) FROM customer_spend) THEN '1. top 10%'
+              WHEN spend_rank <= 0.2 * (SELECT COUNT(*) FROM customer_spend) THEN '2. next 10%'
+              WHEN spend_rank <= 0.5 * (SELECT COUNT(*) FROM customer_spend) THEN '3. next 30%'
+              ELSE '4. bottom 50%'
+         END AS customer_group
+  FROM ranked
+)
+SELECT customer_group,
+       COUNT(*)                 AS customers,
+       ROUND(SUM(spend), 2)     AS spend_usd,
+       ROUND(100 * SUM(spend) / (SELECT SUM(spend) FROM customer_spend), 1) AS share_of_spend_pct,
+       ROUND(MIN(spend), 2)     AS lowest_customer_usd,
+       ROUND(MAX(spend), 2)     AS highest_customer_usd
+FROM grouped
+GROUP BY customer_group
+ORDER BY customer_group;
+
+-- @Q12 | Manomay | Advanced | CTEs + correlated scalar subquery | In each age group, how many customers spend at least twice their group's average?
+WITH customer_spend AS (
+  SELECT c.response_id, c.age_group, SUM(pl.unit_price * pl.quantity) AS total_spend
+  FROM customer c
+  JOIN v_study_purchase pl ON pl.response_id = c.response_id
+  GROUP BY c.response_id, c.age_group
+),
+age_group_avg AS (
+  SELECT age_group,
+         COUNT(*)         AS customers,
+         AVG(total_spend) AS avg_spend,
+         MAX(total_spend) AS top_spend
+  FROM customer_spend
+  GROUP BY age_group
+)
+SELECT a.age_group,
+       a.customers,
+       ROUND(a.avg_spend, 2) AS avg_total_spend_usd,
+       (SELECT COUNT(*) FROM customer_spend s                  -- runs once per age group
+        WHERE s.age_group = a.age_group AND s.total_spend >= 2 * a.avg_spend) AS heavy_buyers,
+       ROUND(a.top_spend, 2) AS top_customer_usd
+FROM age_group_avg a
+ORDER BY a.age_group;

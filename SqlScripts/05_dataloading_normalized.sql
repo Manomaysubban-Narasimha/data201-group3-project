@@ -45,3 +45,43 @@ INSERT INTO customer_life_change (response_id, life_change)
 SELECT DISTINCT response_id, life_change
 FROM stg_survey_life_change;                                   -- 2,055 rows
 
+-- 5d. Products (2NF/3NF): title and category depend on the product (asin), not on the purchase.
+--     Amazon renames listings, so asin -> title fails for 3.1% of products. Rule: keep each
+--     product's latest non-empty title (the newest date, then the later row in the file), and the
+--     same for the category. Only purchase rows we keep count.
+INSERT INTO product (asin, title, category)
+WITH title_day AS (            -- each product's newest purchase date that has a title
+  SELECT asin, MAX(order_date) AS last_day
+  FROM stg_purchase
+  WHERE asin IS NOT NULL AND order_date <= '2023-03-31' AND title IS NOT NULL
+  GROUP BY asin
+),
+title_row AS (                 -- on that date, the last such row in the file
+  SELECT s.asin, MAX(s.line_id) AS line_id
+  FROM stg_purchase s
+  JOIN title_day d ON d.asin = s.asin AND d.last_day = s.order_date
+  WHERE s.title IS NOT NULL
+  GROUP BY s.asin
+),
+category_day AS (              -- the same two steps for the category
+  SELECT asin, MAX(order_date) AS last_day
+  FROM stg_purchase
+  WHERE asin IS NOT NULL AND order_date <= '2023-03-31' AND category IS NOT NULL
+  GROUP BY asin
+),
+category_row AS (
+  SELECT s.asin, MAX(s.line_id) AS line_id
+  FROM stg_purchase s
+  JOIN category_day d ON d.asin = s.asin AND d.last_day = s.order_date
+  WHERE s.category IS NOT NULL
+  GROUP BY s.asin
+),
+products AS (                  -- every product code we keep, once
+  SELECT DISTINCT asin FROM stg_purchase WHERE asin IS NOT NULL AND order_date <= '2023-03-31'
+)
+SELECT p.asin, t.title, c.category
+FROM products p
+LEFT JOIN title_row tr    ON tr.asin = p.asin
+LEFT JOIN stg_purchase t  ON t.line_id = tr.line_id
+LEFT JOIN category_row cr ON cr.asin = p.asin
+LEFT JOIN stg_purchase c  ON c.line_id = cr.line_id;          -- 939,072 rows

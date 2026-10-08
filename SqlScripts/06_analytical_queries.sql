@@ -76,3 +76,85 @@ SELECT order_year,
        ROUND(100 * (spend / prior_3_month_avg - 1), 1) AS pct_above_prior_3_months
 FROM peaks
 ORDER BY order_year;
+
+-------------------------------------------------------
+-- Products and categories analytics queries
+
+-- @Q05 | Basic | JOIN + GROUP BY + COALESCE + LIMIT | Which 10 product categories earn the most, and how many customers buy them?
+SELECT COALESCE(p.category, 'UNKNOWN')         AS category,
+       COUNT(*)                                AS purchase_lines,
+       COUNT(DISTINCT pl.response_id)          AS customers,
+       ROUND(SUM(pl.unit_price * pl.quantity), 2) AS spend_usd,
+       ROUND(AVG(pl.unit_price), 2)            AS avg_unit_price
+FROM v_study_purchase pl
+JOIN product p ON p.asin = pl.asin
+GROUP BY COALESCE(p.category, 'UNKNOWN')
+ORDER BY spend_usd DESC
+LIMIT 10;
+
+-- @Q06 | Basic | CASE + GROUP BY | How are purchase lines and spend split across price bands?
+SELECT CASE
+         WHEN unit_price < 10  THEN '1. under $10'
+         WHEN unit_price < 25  THEN '2. $10 - $24.99'
+         WHEN unit_price < 50  THEN '3. $25 - $49.99'
+         WHEN unit_price < 100 THEN '4. $50 - $99.99'
+         ELSE                       '5. $100 and up'
+       END                                   AS price_band,
+       COUNT(*)                              AS purchase_lines,
+       SUM(quantity)                         AS units,
+       ROUND(SUM(unit_price * quantity), 2)  AS spend_usd
+FROM v_study_purchase
+GROUP BY price_band
+ORDER BY price_band;
+
+-- @Q07 | Advanced | CTEs + correlated COUNT subquery | Leaving out unknown and gift-card items, which 3 categories led each year, and what share did each take?
+WITH category_year AS (
+  SELECT YEAR(pl.order_date) AS order_year,
+         p.category,
+         SUM(pl.unit_price * pl.quantity) AS spend
+  FROM v_study_purchase pl
+  JOIN product p ON p.asin = pl.asin
+  WHERE p.category IS NOT NULL                 -- unknown items are reported separately in Q05
+    AND p.category NOT LIKE '%GIFT_CARD%'      -- gift cards are money, not a product type
+  GROUP BY YEAR(pl.order_date), p.category
+),
+ranked AS (
+  SELECT c.order_year, c.category, c.spend,
+         1 + (SELECT COUNT(*) FROM category_year c2          -- rank = categories that sold more, plus one
+              WHERE c2.order_year = c.order_year AND c2.spend > c.spend) AS rank_in_year,
+         100 * c.spend / (SELECT SUM(c3.spend) FROM category_year c3
+                          WHERE c3.order_year = c.order_year) AS share
+  FROM category_year c
+)
+SELECT order_year, rank_in_year, category,
+       ROUND(spend, 2) AS spend_usd,
+       ROUND(share, 1) AS share_pct
+FROM ranked
+WHERE rank_in_year <= 3
+ORDER BY order_year, rank_in_year;
+
+-- @Q08 | Advanced | CTEs + CASE sums + scalar subqueries | Which categories gained the most share of spending in 2020, the first pandemic year?
+WITH category_spend AS (
+  SELECT COALESCE(p.category, 'UNKNOWN') AS category,
+         SUM(CASE WHEN pl.order_date <  '2020-01-01' THEN pl.unit_price * pl.quantity ELSE 0 END) AS spend_2019,
+         SUM(CASE WHEN pl.order_date >= '2020-01-01' THEN pl.unit_price * pl.quantity ELSE 0 END) AS spend_2020
+  FROM v_study_purchase pl
+  JOIN product p ON p.asin = pl.asin
+  WHERE pl.order_date BETWEEN '2019-01-01' AND '2020-12-31'
+  GROUP BY COALESCE(p.category, 'UNKNOWN')
+),
+shares AS (
+  SELECT category, spend_2019, spend_2020,
+         100 * spend_2019 / (SELECT SUM(spend_2019) FROM category_spend) AS share_2019,
+         100 * spend_2020 / (SELECT SUM(spend_2020) FROM category_spend) AS share_2020
+  FROM category_spend
+)
+SELECT category,
+       ROUND(spend_2019, 2) AS spend_2019_usd,
+       ROUND(spend_2020, 2) AS spend_2020_usd,
+       ROUND(share_2019, 2) AS share_2019_pct,
+       ROUND(share_2020, 2) AS share_2020_pct,
+       ROUND(share_2020 - share_2019, 2) AS share_change_pts
+FROM shares
+ORDER BY share_change_pts DESC
+LIMIT 10;

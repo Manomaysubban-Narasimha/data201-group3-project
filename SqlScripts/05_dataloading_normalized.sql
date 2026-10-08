@@ -85,3 +85,25 @@ LEFT JOIN title_row tr    ON tr.asin = p.asin
 LEFT JOIN stg_purchase t  ON t.line_id = tr.line_id
 LEFT JOIN category_row cr ON cr.asin = p.asin
 LEFT JOIN stg_purchase c  ON c.line_id = cr.line_id;          -- 939,072 rows
+
+
+-- 5e. Purchase lines: what is left of each row. The only step that removes rows.
+INSERT INTO purchase_line (line_id, response_id, asin, order_date, unit_price, quantity, ship_state_code)
+SELECT line_id, response_id, asin, order_date, unit_price, quantity, ship_state
+FROM stg_purchase
+WHERE asin IS NOT NULL                 -- 973 rows without a product code cannot point to a product
+  AND order_date <= '2023-03-31';      -- 18 rows dated after data collection ended (20 March 2023)
+                                       -- 1,849,726 rows
+
+-- Fresh statistics for the query optimizer after loading
+ANALYZE TABLE census_region, census_division, state, customer, customer_race,
+              customer_life_change, product, purchase_line;
+
+-- Check: nothing lost between staging and the final tables (each pair must be equal)
+SELECT (SELECT COUNT(*) FROM stg_purchase WHERE asin IS NOT NULL AND order_date <= '2023-03-31') AS staged_rows_to_keep,
+       (SELECT COUNT(*) FROM purchase_line) AS purchase_lines,
+       (SELECT SUM(unit_price * quantity) FROM stg_purchase
+        WHERE asin IS NOT NULL AND order_date <= '2023-03-31') AS staged_spend_usd,
+       (SELECT SUM(unit_price * quantity) FROM purchase_line) AS loaded_spend_usd,
+       (SELECT COUNT(*) FROM stg_survey) AS survey_rows,
+       (SELECT COUNT(*) FROM customer) AS customers;

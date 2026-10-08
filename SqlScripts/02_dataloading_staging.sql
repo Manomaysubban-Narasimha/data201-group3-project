@@ -23,4 +23,11 @@ IGNORE 1 LINES
  @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip,
  @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip);
 
+-- 2c. Survey: one row per respondent, 23 columns in file order
+LOAD DATA INFILE 'C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/survey.csv'
+INTO TABLE stg_survey
+CHARACTER SET utf8mb4
+FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"' ESCAPED BY ''
+LINES TERMINATED BY '\n'
+IGNORE 1 LINES;
  

@@ -54,4 +54,3 @@ git add file1 file2           # 3. add only your files (avoid "git add .")
 git commit -m "What I changed"   # 4. commit
 git pull                      # 5. get any new teammate changes
 git push                      # 6. share your work
-

@@ -8,3 +8,19 @@ INTO TABLE stg_census_codes
 FIELDS TERMINATED BY '|'
 LINES TERMINATED BY '\n'
 IGNORE 1 LINES;
+
+-- 2b. Census areas: keep the first 5 columns; @skip throws away the 55 population columns
+LOAD DATA INFILE 'C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/NST-EST2023-ALLDATA.csv'
+INTO TABLE stg_census_areas
+CHARACTER SET latin1
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\r\n'
+IGNORE 1 LINES
+(sumlev, region, division, state_fips, name,
+ @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip,
+ @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip,
+ @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip,
+ @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip,
+ @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip, @skip);
+
+ 

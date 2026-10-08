@@ -64,3 +64,18 @@ CREATE TABLE stg_survey_race (
 CREATE TABLE stg_survey_life_change (
   response_id VARCHAR(20) CHARACTER SET ascii COLLATE ascii_bin, life_change VARCHAR(100)
 );
+
+-- amazon-purchases.csv: the purchases file as it is; product and customer repeat on every row
+CREATE TABLE stg_purchase (
+  line_id      INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,   -- numbered 1, 2, 3, ... in file order
+  order_date   DATE,
+  unit_price   DECIMAL(10,2),
+  quantity     DECIMAL(10,2),                             -- the file stores 1.0, 2.0, ...
+  ship_state   CHAR(2) CHARACTER SET ascii COLLATE ascii_bin,
+  title        TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin,
+  asin         VARCHAR(10) CHARACTER SET ascii COLLATE ascii_bin,
+  category     VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin,
+  response_id  VARCHAR(20) CHARACTER SET ascii COLLATE ascii_bin
+);
+
+SHOW TABLES LIKE 'stg%';

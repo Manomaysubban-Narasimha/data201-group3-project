@@ -1,4 +1,4 @@
--- STEP 4 - Create the staging tables
+-- STEP 4 - Create the normalized tables
 
 CREATE DATABASE IF NOT EXISTS amazon_ecommerce
   CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;

@@ -27,7 +27,7 @@ The tables are linked by `Survey ResponseID`.
 
 
 ## Project Goal
-Turn raw dataset files into a normalized MySQL database that we can query (using both basic and advanced SQL queries) to extract valuable insights.
+Turn real-world raw dataset into a normalized MySQL database that we can query (basic + advanced SQL) to extract valuable insights.
 
 ## Steps
 1. Dataset Selection 

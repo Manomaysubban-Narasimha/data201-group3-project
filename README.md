@@ -25,18 +25,16 @@ Fall 2026
 The tables are linked by `Survey ResponseID`.  
 **Period:** 2018–2022
 
-## Mid-Project Presentation Link
-https://docs.google.com/presentation/d/1xdit__9CUikImNtztxCeRcT1ZUJxbLQDneEiSmSHSyM/edit?slide=id.h37ed3da09027b5ac_0_125#slide=id.h37ed3da09027b5ac_0_125 
 
 ## Project Goal
-TBD
+Turn raw dataset files into a normalized MySQL database that we can query (using both basic and advanced SQL queries) to extract valuable insights.
 
 ## Steps
-1. Dataset Selection - Done
-2. Understanding dataset - Done
+1. Dataset Selection 
+2. Understanding dataset 
 3. ER/EER diagram - Done - https://drive.google.com/file/d/19VbYl2XTWtWEDNvoZBGTug6klbM_-23z/view?usp=sharing Kindly access using this link and make required changes and replace in assets/ folder with latest version
-4. Normalization to 3NF - Done
-5. Documentation - In Progress
+4. Normalization to 3NF 
+5. Documentation 
 5. DDL and Data Insertion
 6. Queries
 7. Presentation

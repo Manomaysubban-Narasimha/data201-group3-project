@@ -39,16 +39,55 @@ Turn real-world raw dataset into a normalized MySQL database that we can query (
 6. Queries
 7. Presentation
 
-## Github Guide
-## First time
+## GitHub Guide
+
+### First-Time Setup
+
+Run these commands once:
+
+```bash
 git config --global pull.rebase true
 git config --global rebase.autoStash true
+```
 
-## Every commit
-git pull                      # 1. get the latest
-# ... do your work ...
-git status                    # 2. see what changed
-git add file1 file2           # 3. add only your files (avoid "git add .")
-git commit -m "What I changed"   # 4. commit
-git pull                      # 5. get any new teammate changes
-git push                      # 6. share your work
+### Everyday Workflow
+
+1. Get the latest changes:
+
+```bash
+git pull
+```
+
+2. Make your changes.
+
+3. Check what changed:
+
+```bash
+git status
+```
+
+4. Stage only the files you changed:
+
+```bash
+git add file1 file2
+```
+
+5. Commit your changes:
+
+```bash
+git commit -m "Describe what you changed"
+```
+
+6. Get any new teammate changes:
+
+```bash
+git pull
+```
+
+7. Push your changes:
+
+```bash
+git push
+```
+
+> **Tip:** Avoid `git add .` when possible. Add only the files you intentionally changed.

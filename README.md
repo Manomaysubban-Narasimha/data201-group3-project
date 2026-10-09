@@ -32,7 +32,7 @@ Turn real-world raw dataset into a normalized MySQL database that we can query (
 ## Steps
 1. Dataset Selection 
 2. Understanding dataset 
-3. ER/EER diagram - Done - https://drive.google.com/file/d/19VbYl2XTWtWEDNvoZBGTug6klbM_-23z/view?usp=sharing Kindly access using this link and make required changes and replace in assets/ folder with latest version
+3. ER/EER diagram 
 4. Normalization to 3NF 
 5. Documentation 
 5. DDL and Data Insertion

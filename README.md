@@ -14,7 +14,7 @@ Fall 2026
 **Group 3**
 
 **Dataset:** Open e-commerce 1.0: Five years of crowdsourced U.S. Amazon purchase histories with user demographics  
-**Source:** [Harvard Dataverse](https://doi.org/10.7910/DVN/YGLYDY) (CC0 public domain license)  
+**Source:** [Harvard Dataverse](https://doi.org/10.7910/DVN/YGLYDY) (CC0 1.0 Universal Public Domain Dedication)  
 **Paper:** [Berke, Calacci, et al., *Scientific Data* (2024)](https://doi.org/10.1038/s41597-024-03329-6)
 
 | Table | Rows |
@@ -85,7 +85,7 @@ The folder contains:
 - `state.txt` — U.S. state and territory FIPS codes, abbreviations, and names.
 - `NST-EST2023-ALLDATA.csv` — 2023 Vintage state population estimates file used to map states to Census regions and divisions.
 
-Download **both files** and keep their filenames unchanged. Then place them in the same local data folder as `survey.csv` and `amazon-purchases.csv`. The exact folder location does not matter, because you will update the file paths in `02_dataloading_staging.sql` before running it.
+Download **both files** and keep their filenames unchanged. Keep all four source files together in a local data folder for convenience. Before running `02_dataloading_staging.sql`, follow the `LOAD DATA INFILE` instructions below to place or copy the files into MySQL's permitted import directory, or use the documented `LOAD DATA LOCAL INFILE` alternative.
 
 For project evaluation, use the shared Google Drive folder above so the exact copies used by our group are used.
 
@@ -106,7 +106,7 @@ For project evaluation, use the shared Google Drive folder above so the exact co
 
 5. Before running `02_dataloading_staging.sql`, configure the four `LOAD DATA INFILE` paths so they point to the directory MySQL allows for server-side imports. See the instructions below. If `LOAD DATA INFILE` is inconvenient on your system, especially on macOS, you can instead use the documented `LOAD DATA LOCAL INFILE` alternative.
 
-6. Compare the row counts produced by Scripts 2, 3, and 5 with the validation tables below. If the counts match and there are no MySQL errors, the database loaded successfully.
+6. Compare the row counts from Scripts 2 and 3 with the validation tables below. Script 5 also prints a validation result comparing staged versus loaded purchase rows and spending, plus survey rows versus customers. Use the final-table count query in the validation section to verify all eight normalized tables. If the checks match and there are no MySQL errors, the database loaded successfully.
 
 ### Starting Fresh for a Re-run
 
@@ -140,6 +140,8 @@ The submitted GitHub version of `02_dataloading_staging.sql` uses **`LOAD DATA I
 ```sql
 SHOW VARIABLES LIKE 'secure_file_priv';
 ```
+
+If `secure_file_priv` returns `NULL`, server-side file imports are disabled. Use the `LOAD DATA LOCAL INFILE` alternative below instead.
 
 Copy these four source files into the directory returned by MySQL:
 
@@ -237,7 +239,29 @@ After `05_dataloading_normalized.sql`, the final tables should contain:
 | `product` | 939,072 |
 | `purchase_line` | 1,849,726 |
 
-If these counts match and MySQL Workbench shows no errors, proceed to `06_analytical_queries.sql`.
+To verify all eight final-table counts without changing the database, run this read-only query:
+
+```sql
+SELECT 'census_region' AS table_name, COUNT(*) AS row_count FROM census_region
+UNION ALL
+SELECT 'census_division', COUNT(*) FROM census_division
+UNION ALL
+SELECT 'state', COUNT(*) FROM state
+UNION ALL
+SELECT 'customer', COUNT(*) FROM customer
+UNION ALL
+SELECT 'customer_race', COUNT(*) FROM customer_race
+UNION ALL
+SELECT 'customer_life_change', COUNT(*) FROM customer_life_change
+UNION ALL
+SELECT 'product', COUNT(*) FROM product
+UNION ALL
+SELECT 'purchase_line', COUNT(*) FROM purchase_line;
+```
+
+Script 5 also checks that the staged purchase rows and spending match the loaded `purchase_line` data, and that the survey row count matches the customer count.
+
+If these checks match and MySQL Workbench shows no errors, proceed to `06_analytical_queries.sql`.
 
 ## GitHub Guide for Team Members
 
@@ -248,8 +272,8 @@ If these counts match and MySQL Workbench shows no errors, proceed to `06_analyt
 If you are a team member contributing to the repository, run these commands once:
 
 ```bash
-git config --global pull.rebase true
-git config --global rebase.autoStash true
+git config pull.rebase true
+git config rebase.autoStash true
 ```
 
 ### Everyday Workflow
@@ -296,5 +320,5 @@ git push
 
 **Original U.S. Census Bureau sources (optional):**
 
-- `state.txt`: [ANSI Codes for States](https://www.census.gov/library/reference/code-lists/ansi/ansi-codes-for-states.html) — [direct ](https://www2.census.gov/geo/docs/reference/state.txt)[`state.txt`](https://www2.census.gov/geo/docs/reference/state.txt)[ file](https://www2.census.gov/geo/docs/reference/state.txt)
+- `state.txt`: [ANSI Codes for States](https://www.census.gov/library/reference/code-lists/ansi/ansi-codes-for-states.html) — [direct `state.txt` file](https://www2.census.gov/geo/docs/reference/state.txt)
 - `NST-EST2023-ALLDATA.csv`: [Vintage 2023 National and State Population Estimates](https://www.census.gov/newsroom/press-kits/2023/national-state-population-estimates.html) — [direct CSV file](https://www2.census.gov/programs-surveys/popest/datasets/2020-2023/state/totals/NST-EST2023-ALLDATA.csv)

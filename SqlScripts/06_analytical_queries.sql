@@ -202,33 +202,41 @@ ORDER BY CASE c.order_frequency
            ELSE 3
          END;
 
--- @Q11 | Manomay | Advanced | CTEs + correlated COUNT subquery + CASE | How concentrated is spending? What share comes from the top 10% of customers?
+-- @Q11 | Manomay | Advanced | CTEs + RANK() Window Function + CASE | How concentrated is spending? What share comes from the top 10% of customers?
+
 WITH customer_spend AS (
-  SELECT response_id, SUM(unit_price * quantity) AS spend
-  FROM purchase_line
-  WHERE order_date BETWEEN '2018-01-01' AND '2022-10-31'
-  GROUP BY response_id
+    SELECT response_id,
+           SUM(unit_price * quantity) AS spend
+    FROM purchase_line
+    WHERE order_date BETWEEN '2018-01-01' AND '2022-10-31'
+    GROUP BY response_id
 ),
 ranked AS (
-  SELECT s.spend,
-         1 + (SELECT COUNT(*) FROM customer_spend s2 WHERE s2.spend > s.spend) AS spend_rank   -- 1 = biggest spender
-  FROM customer_spend s
+    SELECT spend,
+           RANK() OVER (
+               ORDER BY spend DESC
+           ) AS spend_rank
+    FROM customer_spend
 ),
 grouped AS (
-  SELECT spend,
-         CASE WHEN spend_rank <= 0.1 * (SELECT COUNT(*) FROM customer_spend) THEN '1. top 10%'
-              WHEN spend_rank <= 0.2 * (SELECT COUNT(*) FROM customer_spend) THEN '2. next 10%'
-              WHEN spend_rank <= 0.5 * (SELECT COUNT(*) FROM customer_spend) THEN '3. next 30%'
-              ELSE '4. bottom 50%'
-         END AS customer_group
-  FROM ranked
+    SELECT spend,
+           CASE
+               WHEN spend_rank <= 0.1 * (SELECT COUNT(*) FROM customer_spend)
+                   THEN '1. top 10%'
+               WHEN spend_rank <= 0.2 * (SELECT COUNT(*) FROM customer_spend)
+                   THEN '2. next 10%'
+               WHEN spend_rank <= 0.5 * (SELECT COUNT(*) FROM customer_spend)
+                   THEN '3. next 30%'
+               ELSE '4. bottom 50%'
+           END AS customer_group
+    FROM ranked
 )
 SELECT customer_group,
-       COUNT(*)                 AS customers,
-       ROUND(SUM(spend), 2)     AS spend_usd,
+       COUNT(*) AS customers,
+       ROUND(SUM(spend), 2) AS spend_usd,
        ROUND(100 * SUM(spend) / (SELECT SUM(spend) FROM customer_spend), 1) AS share_of_spend_pct,
-       ROUND(MIN(spend), 2)     AS lowest_customer_usd,
-       ROUND(MAX(spend), 2)     AS highest_customer_usd
+       ROUND(MIN(spend), 2) AS lowest_customer_usd,
+       ROUND(MAX(spend), 2) AS highest_customer_usd
 FROM grouped
 GROUP BY customer_group
 ORDER BY customer_group;

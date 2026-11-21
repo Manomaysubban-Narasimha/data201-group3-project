@@ -349,3 +349,59 @@ SELECT customer_group,
        ROUND(AVG(jan_oct_2022), 2)       AS avg_jan_oct_spend_2022
 FROM flagged
 GROUP BY customer_group;
+
+
+-- @Q17 | Manomay | Advanced | VIEW + 3-table JOIN + CTE + DENSE_RANK() + Window SUM | Which three product categories generate the most spending within each income bracket?
+
+CREATE OR REPLACE VIEW vw_income_category_spend AS
+SELECT c.income_bracket,
+       p.category,
+       COUNT(DISTINCT c.response_id) AS buyers,
+       SUM(pl.unit_price * pl.quantity) AS spend_usd
+FROM customer c
+JOIN purchase_line pl
+    ON pl.response_id = c.response_id
+JOIN product p
+    ON p.asin = pl.asin
+WHERE pl.order_date BETWEEN '2018-01-01' AND '2022-10-31'
+  AND p.category IS NOT NULL
+  AND p.category NOT LIKE '%GIFT_CARD%'
+GROUP BY c.income_bracket, p.category;
+
+
+WITH category_ranks AS (
+    SELECT income_bracket,
+           category,
+           buyers,
+           spend_usd,
+           DENSE_RANK() OVER (
+               PARTITION BY income_bracket
+               ORDER BY spend_usd DESC
+           ) AS category_rank,
+           SUM(spend_usd) OVER (
+               PARTITION BY income_bracket
+           ) AS bracket_spend_usd
+    FROM vw_income_category_spend
+)
+SELECT income_bracket,
+       category_rank,
+       category,
+       buyers,
+       ROUND(spend_usd, 2) AS category_spend_usd,
+       CASE
+           WHEN bracket_spend_usd = 0 THEN NULL
+           ELSE ROUND(100 * spend_usd / bracket_spend_usd, 1)
+       END AS share_of_bracket_spend_pct
+FROM category_ranks
+WHERE category_rank <= 3
+ORDER BY CASE income_bracket
+             WHEN 'Less than $25,000'   THEN 1
+             WHEN '$25,000 - $49,999'   THEN 2
+             WHEN '$50,000 - $74,999'   THEN 3
+             WHEN '$75,000 - $99,999'   THEN 4
+             WHEN '$100,000 - $149,999' THEN 5
+             WHEN '$150,000 or more'    THEN 6
+             ELSE 7
+         END,
+         category_rank,
+         category;

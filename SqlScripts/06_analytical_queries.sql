@@ -405,3 +405,62 @@ ORDER BY CASE income_bracket
          END,
          category_rank,
          category;
+         
+
+-- @Q18 | Manomay | Advanced | CTEs + JOIN + LAG() Window Function + CASE | How did average annual spending per purchasing customer change year over year across different age groups from 2018 to 2021?
+
+WITH age_year_spend AS (
+    SELECT COALESCE(c.age_group, 'Unknown') AS age_group,
+           YEAR(pl.order_date) AS order_year,
+           COUNT(DISTINCT c.response_id) AS purchasing_customers,
+           SUM(pl.unit_price * pl.quantity) AS total_spend,
+           SUM(pl.unit_price * pl.quantity) /
+               COUNT(DISTINCT c.response_id) AS spend_per_customer
+    FROM customer c
+    JOIN purchase_line pl
+        ON pl.response_id = c.response_id
+    WHERE pl.order_date BETWEEN '2018-01-01' AND '2021-12-31'
+    GROUP BY COALESCE(c.age_group, 'Unknown'),
+             YEAR(pl.order_date)
+),
+spending_trends AS (
+    SELECT age_group,
+           order_year,
+           purchasing_customers,
+           total_spend,
+           spend_per_customer,
+           LAG(order_year) OVER (
+               PARTITION BY age_group
+               ORDER BY order_year
+           ) AS previous_year,
+           LAG(spend_per_customer) OVER (
+               PARTITION BY age_group
+               ORDER BY order_year
+           ) AS previous_year_spend_per_customer
+    FROM age_year_spend
+)
+SELECT age_group,
+       order_year,
+       purchasing_customers,
+       ROUND(total_spend, 2) AS total_spend_usd,
+       ROUND(spend_per_customer, 2) AS spend_per_customer_usd,
+       CASE
+           WHEN previous_year = order_year - 1
+               THEN ROUND(previous_year_spend_per_customer, 2)
+           ELSE NULL
+       END AS previous_year_spend_per_customer_usd,
+       CASE
+           WHEN previous_year = order_year - 1
+                AND previous_year_spend_per_customer IS NOT NULL
+                AND previous_year_spend_per_customer <> 0
+           THEN ROUND(
+               100 * (spend_per_customer -
+                      previous_year_spend_per_customer)
+                   / previous_year_spend_per_customer, 1
+           )
+           ELSE NULL
+       END AS yoy_spending_change_pct
+FROM spending_trends
+ORDER BY age_group, order_year;
+
+

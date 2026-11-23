@@ -464,3 +464,46 @@ FROM spending_trends
 ORDER BY age_group, order_year;
 
 
+-- @Q19 | Manomay | Advanced | Correlated Subquery (EXISTS) + CTE + CASE | What percentage of customers who purchased in a given year returned the following year, broken down by age group?
+
+WITH yearly_buyers AS (
+    SELECT DISTINCT
+           pl.response_id,
+           COALESCE(c.age_group, 'Unknown') AS age_group,
+           YEAR(pl.order_date) AS order_year
+    FROM purchase_line pl
+    JOIN customer c
+        ON c.response_id = pl.response_id
+    WHERE pl.order_date BETWEEN '2018-01-01' AND '2021-12-31'
+),
+
+retention_flags AS (
+    SELECT y.response_id,
+           y.age_group,
+           y.order_year,
+           CASE
+               WHEN EXISTS (
+                   SELECT 1
+                   FROM yearly_buyers next_year
+                   WHERE next_year.response_id = y.response_id
+                     AND next_year.order_year = y.order_year + 1
+               ) THEN 1
+               ELSE 0
+           END AS returned_next_year
+    FROM yearly_buyers y
+    WHERE y.order_year BETWEEN 2018 AND 2020
+)
+
+SELECT order_year,
+       order_year + 1 AS following_year,
+       age_group,
+       COUNT(*) AS purchasing_customers,
+       SUM(returned_next_year) AS returning_customers,
+       ROUND(100.0 * SUM(returned_next_year) / COUNT(*), 1)
+           AS retention_rate_pct
+FROM retention_flags
+GROUP BY order_year, age_group
+ORDER BY order_year, age_group;
+
+
+

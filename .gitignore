@@ -3,3 +3,7 @@ data/
 .DS_Store
 New Folder/
 sql/
+.env
+__pycache__/
+*.pyc
+.venv/

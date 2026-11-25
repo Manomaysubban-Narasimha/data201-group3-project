@@ -506,4 +506,146 @@ GROUP BY order_year, age_group
 ORDER BY order_year, age_group;
 
 
+-- @Q20 | Mourya | Advanced | CTEs + LAG() window function + CASE | BUSINESS QUESTION: How did monthly spending change from the immediately
+-- preceding month during the four complete calendar years 2018-2021?
+WITH monthly_sales AS (
+    SELECT YEAR(order_date) AS order_year,
+           MONTH(order_date) AS order_month,
+           COUNT(DISTINCT response_id) AS active_customers,
+           SUM(unit_price * quantity) AS spend_usd
+    FROM purchase_line
+    WHERE order_date BETWEEN '2018-01-01' AND '2021-12-31'
+    GROUP BY YEAR(order_date), MONTH(order_date)
+),
+monthly_comparison AS (
+    SELECT order_year,
+           order_month,
+           order_year * 12 + order_month AS month_number,
+           active_customers,
+           spend_usd,
+           LAG(order_year * 12 + order_month) OVER (
+               ORDER BY order_year, order_month
+           ) AS previous_month_number,
+           LAG(spend_usd) OVER (
+               ORDER BY order_year, order_month
+           ) AS previous_month_spend
+    FROM monthly_sales
+)
+SELECT order_year,
+       order_month,
+       active_customers,
+       ROUND(spend_usd, 2) AS monthly_spend_usd,
+       CASE
+           WHEN previous_month_number = month_number - 1
+               THEN ROUND(previous_month_spend, 2)
+           ELSE NULL
+       END AS prior_month_spend_usd,
+       CASE
+           WHEN previous_month_number = month_number - 1
+                AND previous_month_spend IS NOT NULL
+                AND previous_month_spend <> 0
+               THEN ROUND(100.0 * (spend_usd - previous_month_spend)
+                          / previous_month_spend, 1)
+           ELSE NULL
+       END AS month_over_month_change_pct
+FROM monthly_comparison
+ORDER BY order_year, order_month;
 
+
+-- @Q21 | Mourya | Advanced | VIEW + CTEs + scalar subquery + DENSE_RANK()
+-- BUSINESS QUESTION: Which months had the highest proportion of customers who shopped on at least two different days within that month?
+
+CREATE OR REPLACE VIEW vw_mourya_customer_month_activity AS
+SELECT YEAR(order_date) AS order_year,
+       MONTH(order_date) AS order_month,
+       response_id,
+       COUNT(DISTINCT order_date) AS shopping_days
+FROM purchase_line
+WHERE order_date BETWEEN '2018-01-01' AND '2021-12-31'
+GROUP BY YEAR(order_date), MONTH(order_date), response_id;
+
+WITH monthly_repeat AS (
+    SELECT order_year,
+           order_month,
+           COUNT(*) AS active_customers,
+           SUM(CASE WHEN shopping_days >= 2 THEN 1 ELSE 0 END)
+               AS repeat_day_customers
+    FROM vw_mourya_customer_month_activity
+    GROUP BY order_year, order_month
+),
+monthly_rates AS (
+    SELECT order_year,
+           order_month,
+           active_customers,
+           repeat_day_customers,
+           100.0 * repeat_day_customers / active_customers AS repeat_day_pct
+    FROM monthly_repeat
+)
+SELECT order_year,
+       order_month,
+       active_customers,
+       repeat_day_customers,
+       ROUND(repeat_day_pct, 1) AS repeat_day_customers_pct,
+       CASE
+           WHEN repeat_day_pct > (
+               SELECT AVG(repeat_day_pct) FROM monthly_rates
+           ) THEN 'Above typical month'
+           ELSE 'At or below typical month'
+       END AS comparison_to_study_monthly_average,
+       DENSE_RANK() OVER (
+           PARTITION BY order_year
+           ORDER BY repeat_day_pct DESC
+       ) AS rank_within_year
+FROM monthly_rates
+ORDER BY order_year, rank_within_year, order_month;
+
+
+
+-- @Q22 | Mourya | Advanced | CTE + JOIN + conditional distinct counts + CASE | BUSINESS QUESTION: What percentage of each month's spending came from
+-- customers making their FIRST OBSERVED purchase that month?
+
+WITH first_observed_purchase AS (
+    SELECT response_id,
+           MIN(order_date) AS first_order_date
+    FROM purchase_line
+    WHERE order_date BETWEEN '2018-01-01' AND '2022-10-31'
+    GROUP BY response_id
+),
+monthly_buyer_mix AS (
+    SELECT YEAR(pl.order_date) AS order_year,
+           MONTH(pl.order_date) AS order_month,
+           COUNT(DISTINCT pl.response_id) AS purchasing_customers,
+           COUNT(DISTINCT CASE
+               WHEN YEAR(fp.first_order_date) = YEAR(pl.order_date)
+                AND MONTH(fp.first_order_date) = MONTH(pl.order_date)
+                   THEN pl.response_id
+               ELSE NULL
+           END) AS first_observed_buyers,
+           SUM(CASE
+               WHEN YEAR(fp.first_order_date) = YEAR(pl.order_date)
+                AND MONTH(fp.first_order_date) = MONTH(pl.order_date)
+                   THEN pl.unit_price * pl.quantity
+               ELSE 0
+           END) AS first_observed_spend,
+           SUM(pl.unit_price * pl.quantity) AS total_spend
+    FROM purchase_line pl
+    JOIN first_observed_purchase fp
+        ON fp.response_id = pl.response_id
+    WHERE pl.order_date BETWEEN '2018-01-01' AND '2022-10-31'
+    GROUP BY YEAR(pl.order_date), MONTH(pl.order_date)
+)
+SELECT order_year,
+       order_month,
+       purchasing_customers,
+       first_observed_buyers,
+       purchasing_customers - first_observed_buyers AS previously_observed_buyers,
+       ROUND(first_observed_spend, 2) AS first_observed_spend_usd,
+       ROUND(total_spend - first_observed_spend, 2)
+           AS previously_observed_spend_usd,
+       ROUND(total_spend, 2) AS total_spend_usd,
+       CASE
+           WHEN total_spend = 0 THEN NULL
+           ELSE ROUND(100.0 * first_observed_spend / total_spend, 1)
+       END AS first_observed_share_of_spend_pct
+FROM monthly_buyer_mix
+ORDER BY order_year, order_month;

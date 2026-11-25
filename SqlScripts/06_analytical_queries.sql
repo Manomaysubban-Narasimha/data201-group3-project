@@ -692,3 +692,66 @@ SELECT customer_home_region,
        END AS out_of_state_spend_pct
 FROM vw_kashif_home_region_shipping
 ORDER BY out_of_state_lines_pct DESC, customer_home_region;
+
+-- @Q27 | Kashif | Advanced | CTEs + correlated EXISTS + conditional aggregation
+-- BUSINESS QUESTION: Among customers who purchased in BOTH 2020 and 2021,
+-- did average spending change differently for customers reporting a move in
+-- 2021 versus customers who did not report one?
+WITH annual_customer_spend AS (
+    SELECT pl.response_id,
+           SUM(CASE
+               WHEN pl.order_date < '2021-01-01'
+                   THEN pl.unit_price * pl.quantity
+               ELSE 0
+           END) AS spend_2020,
+           SUM(CASE
+               WHEN pl.order_date >= '2021-01-01'
+                   THEN pl.unit_price * pl.quantity
+               ELSE 0
+           END) AS spend_2021,
+           SUM(CASE WHEN pl.order_date < '2021-01-01' THEN 1 ELSE 0 END)
+               AS lines_2020,
+           SUM(CASE WHEN pl.order_date >= '2021-01-01' THEN 1 ELSE 0 END)
+               AS lines_2021
+    FROM purchase_line pl
+    WHERE pl.order_date BETWEEN '2020-01-01' AND '2021-12-31'
+    GROUP BY pl.response_id
+),
+matched_customers AS (
+    SELECT s.response_id,
+           s.spend_2020,
+           s.spend_2021,
+           CASE
+               WHEN EXISTS (
+                   SELECT 1
+                   FROM customer_life_change lc
+                   WHERE lc.response_id = s.response_id
+                     AND lc.life_change = 'Moved place of residence'
+               ) THEN 'Reported move in 2021'
+               ELSE 'No move reported in 2021'
+           END AS moving_group
+    FROM annual_customer_spend s
+    WHERE s.lines_2020 > 0
+      AND s.lines_2021 > 0
+),
+move_group_summary AS (
+    SELECT moving_group,
+           COUNT(*) AS customers_active_both_years,
+           AVG(spend_2020) AS avg_spend_2020,
+           AVG(spend_2021) AS avg_spend_2021
+    FROM matched_customers
+    GROUP BY moving_group
+)
+SELECT moving_group,
+       customers_active_both_years,
+       ROUND(avg_spend_2020, 2) AS avg_spend_2020_usd,
+       ROUND(avg_spend_2021, 2) AS avg_spend_2021_usd,
+       ROUND(avg_spend_2021 - avg_spend_2020, 2)
+           AS average_spend_change_usd,
+       CASE
+           WHEN avg_spend_2020 = 0 THEN NULL
+           ELSE ROUND(100.0 * (avg_spend_2021 - avg_spend_2020)
+                      / avg_spend_2020, 1)
+       END AS change_in_average_spend_pct
+FROM move_group_summary
+ORDER BY moving_group;

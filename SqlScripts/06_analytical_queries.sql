@@ -755,3 +755,52 @@ SELECT moving_group,
        END AS change_in_average_spend_pct
 FROM move_group_summary
 ORDER BY moving_group;
+
+-- @Q28 | Kashif | Advanced | 5-table JOIN + CTEs + DENSE_RANK() + CASE
+-- BUSINESS QUESTION: What percentage of customers with a known U.S. home
+-- region had purchases shipped to MORE THAN ONE state/territory code?
+
+WITH shipping_breadth AS (
+    SELECT c.response_id,
+           r.region_name AS customer_home_region,
+           COUNT(DISTINCT pl.ship_state_code) AS distinct_ship_state_codes
+    FROM customer c
+    JOIN state s
+        ON s.state_code = c.state_code
+    JOIN census_division d
+        ON d.division_id = s.division_id
+    JOIN census_region r
+        ON r.region_id = d.region_id
+    JOIN purchase_line pl
+        ON pl.response_id = c.response_id
+    WHERE pl.order_date BETWEEN '2018-01-01' AND '2022-10-31'
+      AND pl.ship_state_code IS NOT NULL
+    GROUP BY c.response_id, r.region_name
+),
+region_shipping_metrics AS (
+    SELECT customer_home_region,
+           COUNT(*) AS customers_with_shipping_addresses,
+           SUM(CASE
+               WHEN distinct_ship_state_codes >= 2 THEN 1
+               ELSE 0
+           END) AS multi_state_shipping_customers,
+           100.0 * AVG(CASE
+               WHEN distinct_ship_state_codes >= 2 THEN 1
+               ELSE 0
+           END) AS multi_state_shipping_customer_pct,
+           AVG(distinct_ship_state_codes) AS avg_shipping_state_codes_per_customer
+    FROM shipping_breadth
+    GROUP BY customer_home_region
+)
+SELECT DENSE_RANK() OVER (
+           ORDER BY multi_state_shipping_customer_pct DESC
+       ) AS region_rank,
+       customer_home_region,
+       customers_with_shipping_addresses,
+       multi_state_shipping_customers,
+       ROUND(multi_state_shipping_customer_pct, 1)
+           AS multi_state_shipping_customer_pct,
+       ROUND(avg_shipping_state_codes_per_customer, 2)
+           AS avg_shipping_state_codes_per_customer
+FROM region_shipping_metrics
+ORDER BY region_rank, customer_home_region;

@@ -649,3 +649,46 @@ SELECT order_year,
        END AS first_observed_share_of_spend_pct
 FROM monthly_buyer_mix
 ORDER BY order_year, order_month;
+-- @Q26 | Kashif | Advanced | VIEW + 5-table JOIN + conditional aggregation
+-- BUSINESS QUESTION: How often are shipments sent outside the customer's
+-- CURRENT state of residence, by the customer's home Census region?
+CREATE OR REPLACE VIEW vw_kashif_home_region_shipping AS
+SELECT r.region_name AS customer_home_region,
+       COUNT(*) AS shipped_purchase_lines,
+       COUNT(DISTINCT c.response_id) AS customers_with_shipped_lines,
+       SUM(CASE
+           WHEN pl.ship_state_code <> c.state_code THEN 1
+           ELSE 0
+       END) AS out_of_state_lines,
+       SUM(pl.unit_price * pl.quantity) AS shipped_spend,
+       SUM(CASE
+           WHEN pl.ship_state_code <> c.state_code
+               THEN pl.unit_price * pl.quantity
+           ELSE 0
+       END) AS out_of_state_spend
+FROM customer c
+JOIN state s
+    ON s.state_code = c.state_code
+JOIN census_division d
+    ON d.division_id = s.division_id
+JOIN census_region r
+    ON r.region_id = d.region_id
+JOIN purchase_line pl
+    ON pl.response_id = c.response_id
+WHERE pl.order_date BETWEEN '2018-01-01' AND '2022-10-31'
+  AND pl.ship_state_code IS NOT NULL
+GROUP BY r.region_name;
+
+SELECT customer_home_region,
+       customers_with_shipped_lines,
+       shipped_purchase_lines,
+       out_of_state_lines,
+       ROUND(100.0 * out_of_state_lines / shipped_purchase_lines, 1)
+           AS out_of_state_lines_pct,
+       ROUND(shipped_spend, 2) AS shipped_spend_usd,
+       CASE
+           WHEN shipped_spend = 0 THEN NULL
+           ELSE ROUND(100.0 * out_of_state_spend / shipped_spend, 1)
+       END AS out_of_state_spend_pct
+FROM vw_kashif_home_region_shipping
+ORDER BY out_of_state_lines_pct DESC, customer_home_region;

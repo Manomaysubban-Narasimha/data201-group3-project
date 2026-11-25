@@ -160,47 +160,78 @@ def render():
             key='q18_metric',
         )
 
+        # Both charts use the identical SQL result and show the same tooltips.
+        tooltip = [
+            alt.Tooltip('age_group:N', title='Age group'),
+            alt.Tooltip('year_label:O', title='Year'),
+            alt.Tooltip('purchasing_customers:Q', title='Purchasing customers', format=','),
+            alt.Tooltip('spend_per_customer_usd:Q', title='USD per customer', format='$,.2f'),
+            alt.Tooltip(
+                'previous_year_spend_per_customer_usd:Q',
+                title='Previous-year USD per customer',
+                format='$,.2f',
+            ),
+            alt.Tooltip('yoy_spending_change_pct:Q', title='Year-over-year change (%)', format='.1f'),
+        ]
+
         if q18_metric == 'Annual spending (USD)':
-            chart_data = spending
-            chart_years = ['2018', '2019', '2020', '2021']
-            y_axis = alt.Y(
-                'spend_per_customer_usd:Q',
-                axis=alt.Axis(title='Annual USD per purchasing customer', format='$,.0f'),
-                scale=alt.Scale(zero=False),
+            # A line chart is most useful for spending trends over four years.
+            spending_chart = (
+                alt.Chart(spending)
+                .mark_line(point=True, strokeWidth=2.5)
+                .encode(
+                    x=alt.X(
+                        'year_label:O',
+                        sort=['2018', '2019', '2020', '2021'],
+                        axis=alt.Axis(title='Year', labelAngle=0),
+                    ),
+                    y=alt.Y(
+                        'spend_per_customer_usd:Q',
+                        axis=alt.Axis(title='Annual USD per purchasing customer', format='$,.0f'),
+                        scale=alt.Scale(zero=False),
+                    ),
+                    color=_age_color(),
+                    tooltip=tooltip,
+                )
+                .properties(height=400)
             )
         else:
-            # Q18 returns NULL for 2018: no previous year exists to compare against.
+            # 2018 is excluded because it has no earlier year to compare against.
+            # Within each age group, put 2019, 2020, and 2021 next to one another.
+            # The zero baseline allows increases and decreases to be read correctly.
             chart_data = spending.dropna(subset=['yoy_spending_change_pct'])
-            chart_years = ['2019', '2020', '2021']
-            y_axis = alt.Y(
-                'yoy_spending_change_pct:Q',
-                axis=alt.Axis(title='Year-over-year spending change (%)', format='.1f'),
-                scale=alt.Scale(zero=True),
+            spending_chart = (
+                alt.Chart(chart_data)
+                .mark_bar()
+                .encode(
+                    x=alt.X(
+                        'age_group:N',
+                        sort=AGE_ORDER + ['Unknown'],
+                        axis=alt.Axis(title='Age group', labelAngle=-25, labelLimit=150),
+                    ),
+                    xOffset=alt.XOffset(
+                        'year_label:N',
+                        sort=['2019', '2020', '2021'],
+                    ),
+                    y=alt.Y(
+                        'yoy_spending_change_pct:Q',
+                        axis=alt.Axis(title='Year-over-year spending change (%)', format='.1f'),
+                        scale=alt.Scale(zero=True),
+                    ),
+                    color=alt.Color(
+                        'year_label:N',
+                        title='Year',
+                        sort=['2019', '2020', '2021'],
+                    ),
+                    tooltip=tooltip,
+                )
+                .properties(height=420)
             )
-            st.caption('Year-over-year changes start in 2019 because 2018 has no prior year in the query.')
+            st.caption(
+                'Three bars per age group show 2019, 2020, and 2021. '
+                'There is no 2018 percentage change because the query has no earlier comparison year.'
+            )
 
-        spending_chart = (
-            alt.Chart(chart_data)
-            .mark_line(point=True, strokeWidth=2.5)
-            .encode(
-                x=alt.X(
-                    'year_label:O',
-                    sort=chart_years,
-                    axis=alt.Axis(title='Year', labelAngle=0),
-                ),
-                y=y_axis,
-                color=_age_color(),
-                tooltip=[
-                    alt.Tooltip('year_label:O', title='Year'),
-                    alt.Tooltip('age_group:N', title='Age group'),
-                    alt.Tooltip('purchasing_customers:Q', title='Purchasing customers', format=','),
-                    alt.Tooltip('spend_per_customer_usd:Q', title='USD per customer', format='$,.2f'),
-                    alt.Tooltip('previous_year_spend_per_customer_usd:Q', title='Previous-year USD per customer', format='$,.2f'),
-                    alt.Tooltip('yoy_spending_change_pct:Q', title='Year-over-year change (%)', format='.1f'),
-                ],
-            )
-            .properties(height=400)
-        )
         st.altair_chart(spending_chart, use_container_width=True)
         with st.expander('Full Q18 query results'):
             st.dataframe(

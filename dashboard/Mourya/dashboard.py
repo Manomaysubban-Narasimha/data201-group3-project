@@ -1,12 +1,23 @@
+"""Mourya's dashboard section: Q20 monthly spending and Q21 repeat shopping.
+
+Self-contained on purpose: it imports no teammate code (not even the shared
+db.py), and each query renders inside its own error boundary, so changes
+elsewhere in the group dashboard cannot break this section.
+"""
 
 import calendar
+import os
+from pathlib import Path
 
 import altair as alt
 import pandas as pd
 import pymysql
 import streamlit as st
+from dotenv import load_dotenv
 
-from db import query
+# Same MYSQL_* settings as the rest of the dashboard (dashboard/.env or the OS
+# environment); only the connection code is private to this section.
+load_dotenv(Path(__file__).resolve().parents[1] / '.env')
 
 
 # Exact Q20 statement from Mourya_advanced.sql (no modifications).
@@ -109,6 +120,29 @@ MONTH_ABBREVIATIONS = [calendar.month_abbr[month] for month in range(1, 13)]
 YEAR_LABELS = ['2018', '2019', '2020', '2021']
 
 
+@st.cache_data(ttl=900, show_spinner=False)
+def _query(sql: str) -> pd.DataFrame:
+    """Return the rows of one read-only SELECT. Never write to the database here."""
+    db = pymysql.connect(
+        host=os.environ.get('MYSQL_HOST', '127.0.0.1'),
+        port=int(os.environ.get('MYSQL_PORT', '3306')),
+        user=os.environ.get('MYSQL_USER', 'root'),
+        password=os.environ.get('MYSQL_PASSWORD', ''),
+        database=os.environ.get('MYSQL_DATABASE', 'amazon_ecommerce'),
+        charset='utf8mb4',
+        cursorclass=pymysql.cursors.DictCursor,
+        connect_timeout=10,
+        read_timeout=180,
+        autocommit=True,
+    )
+    try:
+        with db.cursor() as cursor:
+            cursor.execute(sql)
+            return pd.DataFrame(cursor.fetchall())
+    finally:
+        db.close()
+
+
 def _prepare_monthly_rows(df, numeric_fields):
     """Prepare chart-friendly types without changing any SQL result values."""
     df = df.copy()
@@ -189,7 +223,7 @@ def _q20_chart(monthly):
             )
         )
 
-    st.altair_chart(chart.properties(height=380), use_container_width=True)
+    st.altair_chart(chart.properties(height=380), width='stretch')
 
 
 def _q21_heatmap(repeat):
@@ -252,42 +286,43 @@ def _q21_heatmap(repeat):
         'Hover for the exact annual rank and comparison to the study average. '
         'Color intensity is relative to the displayed months.'
     )
-    st.altair_chart((cells + numbers).properties(height=210), use_container_width=True)
+    st.altair_chart((cells + numbers).properties(height=210), width='stretch')
 
 
-def render():
-    st.header('Monthly spending and repeat shopping — Mourya')
-    st.caption('Q20 and Q21 use all twelve months of each year from 2018 through 2021.')
-
+def _render_q20():
     st.subheader('Q20 · Monthly spending and month-over-month change')
-    monthly = query(MONTHLY_SALES_SQL)
+    monthly = _query(MONTHLY_SALES_SQL)
     if monthly.empty:
         st.warning('No spending rows returned for Q20.')
-    else:
-        monthly = _prepare_monthly_rows(
-            monthly,
-            ('active_customers', 'monthly_spend_usd',
-             'prior_month_spend_usd', 'month_over_month_change_pct'),
-        )
-        if monthly.empty:
-            st.warning('Q20 did not return usable calendar months.')
-        else:
-            _q20_chart(monthly)
-            with st.expander('Full Q20 query results'):
-                st.dataframe(
-                    monthly.drop(columns=['month_date', 'month_label',
-                                          'year_label', 'month_short']),
-                    use_container_width=True,
-                    hide_index=True,
-                )
+        return
 
+    monthly = _prepare_monthly_rows(
+        monthly,
+        ('active_customers', 'monthly_spend_usd',
+         'prior_month_spend_usd', 'month_over_month_change_pct'),
+    )
+    if monthly.empty:
+        st.warning('Q20 did not return usable calendar months.')
+        return
+
+    _q20_chart(monthly)
+    with st.expander('Full Q20 query results'):
+        st.dataframe(
+            monthly.drop(columns=['month_date', 'month_label',
+                                  'year_label', 'month_short']),
+            width='stretch',
+            hide_index=True,
+        )
+
+
+def _render_q21():
     st.subheader('Q21 · Repeat-shopping activity by month')
     st.caption(
         'A repeat-day customer shopped on at least two distinct dates within '
         'the same month. The benchmark is the unweighted average of monthly rates.'
     )
     try:
-        repeat = query(REPEAT_SQL)
+        repeat = _query(REPEAT_SQL)
     except pymysql.MySQLError as err:
         if err.args and err.args[0] == 1146:
             st.error('Q21 requires the SQL view vw_mourya_customer_month_activity.')
@@ -330,12 +365,40 @@ def render():
                 'comparison_to_study_monthly_average': 'Vs. study average',
             })
         )
-        st.dataframe(ranking, use_container_width=True, hide_index=True)
+        st.dataframe(ranking, width='stretch', hide_index=True)
 
     with st.expander('Full Q21 query results'):
         st.dataframe(
             repeat.drop(columns=['month_date', 'month_label',
                                  'year_label', 'month_short']),
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
         )
+
+
+def _run_isolated(label, render_section):
+    """Contain a failure to one query so the other still renders.
+
+    Shows the full traceback here instead of relying on app.py's handler,
+    which reports only a one-line message. Streamlit's rerun/stop signals
+    derive from BaseException, so they pass through untouched.
+    """
+    try:
+        render_section()
+    except Exception as err:
+        st.error(f'{label} could not be displayed.')
+        st.exception(err)
+
+
+def render():
+    st.header('Monthly spending and repeat shopping')
+    st.caption('Q20 and Q21 use all twelve months of each year from 2018 through 2021.')
+    _run_isolated('Q20', _render_q20)
+    _run_isolated('Q21', _render_q21)
+
+
+if __name__ == '__main__':
+    # Fallback that works even if the shared app.py breaks:
+    #   streamlit run dashboard/Mourya/dashboard.py
+    st.set_page_config(page_title='DATA 201 | Monthly spending', layout='wide')
+    render()

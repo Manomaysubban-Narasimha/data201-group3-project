@@ -25,3 +25,10 @@ SELECT COUNT(*) AS purchase_lines,
 FROM purchase_line
 WHERE order_date >= '2022-10-01'
   AND order_date < '2022-11-01';
+
+
+
+CREATE INDEX idx_pl_order_date_cover_spend
+    ON purchase_line (order_date, response_id, unit_price, quantity);
+
+SHOW INDEX FROM purchase_line;

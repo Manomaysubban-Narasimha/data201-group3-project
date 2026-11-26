@@ -649,6 +649,147 @@ SELECT order_year,
        END AS first_observed_share_of_spend_pct
 FROM monthly_buyer_mix
 ORDER BY order_year, order_month;
+
+-- @Q23 | Waqas | Advanced | VIEW + CTE + scalar subquery + HAVING
+-- BUSINESS QUESTION: Which product categories have the highest proportion of
+-- buyers who purchased from that category on two or more different days?
+
+CREATE OR REPLACE VIEW vw_waqas_customer_category_activity AS
+SELECT p.category,
+       pl.response_id,
+       COUNT(DISTINCT pl.order_date) AS distinct_purchase_days,
+       SUM(pl.unit_price * pl.quantity) AS customer_category_spend
+FROM purchase_line pl
+JOIN product p
+    ON p.asin = pl.asin
+WHERE pl.order_date BETWEEN '2018-01-01' AND '2022-10-31'
+  AND p.category IS NOT NULL
+  AND p.category NOT LIKE '%GIFT_CARD%'
+GROUP BY p.category, pl.response_id;
+
+WITH category_repeat AS (
+    SELECT category,
+           COUNT(*) AS category_buyers,
+           SUM(CASE WHEN distinct_purchase_days >= 2 THEN 1 ELSE 0 END)
+               AS repeat_category_buyers,
+           ROUND(AVG(customer_category_spend), 2)
+               AS average_spend_per_buyer_usd
+    FROM vw_waqas_customer_category_activity
+    GROUP BY category
+    HAVING COUNT(*) >= 100
+)
+SELECT category,
+       category_buyers,
+       repeat_category_buyers,
+       ROUND(100.0 * repeat_category_buyers / category_buyers, 1)
+           AS repeat_category_buyer_pct,
+       CASE
+           WHEN 100.0 * repeat_category_buyers / category_buyers > (
+               SELECT AVG(100.0 * repeat_category_buyers / category_buyers)
+               FROM category_repeat
+           ) THEN 'Above eligible-category average'
+           ELSE 'At or below eligible-category average'
+       END AS comparison_to_eligible_category_average,
+       average_spend_per_buyer_usd
+FROM category_repeat
+ORDER BY repeat_category_buyer_pct DESC, category_buyers DESC, category
+LIMIT 15;
+
+
+
+-- @Q24 | Waqas | Advanced | 5-table JOIN + CTEs + DENSE_RANK() + window SUM
+-- BUSINESS QUESTION: Which three product categories produced the most revenue
+-- in each U.S. Census region of the SHIPPING address?
+
+WITH region_category_spend AS (
+    SELECT r.region_name AS shipping_region,
+           p.category,
+           COUNT(DISTINCT pl.response_id) AS category_buyers,
+           SUM(pl.unit_price * pl.quantity) AS category_spend
+    FROM purchase_line pl
+    JOIN product p
+        ON p.asin = pl.asin
+    JOIN state s
+        ON s.state_code = pl.ship_state_code
+    JOIN census_division d
+        ON d.division_id = s.division_id
+    JOIN census_region r
+        ON r.region_id = d.region_id
+    WHERE pl.order_date BETWEEN '2018-01-01' AND '2022-10-31'
+      AND p.category IS NOT NULL
+      AND p.category NOT LIKE '%GIFT_CARD%'
+    GROUP BY r.region_name, p.category
+),
+regional_ranks AS (
+    SELECT shipping_region,
+           category,
+           category_buyers,
+           category_spend,
+           DENSE_RANK() OVER (
+               PARTITION BY shipping_region
+               ORDER BY category_spend DESC
+           ) AS category_rank,
+           SUM(category_spend) OVER (
+               PARTITION BY shipping_region
+           ) AS total_region_category_spend
+    FROM region_category_spend
+)
+SELECT shipping_region,
+       category_rank,
+       category,
+       category_buyers,
+       ROUND(category_spend, 2) AS category_spend_usd,
+       CASE
+           WHEN total_region_category_spend = 0 THEN NULL
+           ELSE ROUND(100.0 * category_spend /
+                      total_region_category_spend, 1)
+       END AS share_of_region_spend_pct
+FROM regional_ranks
+WHERE category_rank <= 3
+ORDER BY shipping_region, category_rank, category;
+
+
+-- @Q25 | Waqas | Advanced | CTEs + conditional aggregation + DENSE_RANK()
+-- BUSINESS QUESTION: Which established product categories most often have
+-- purchase lines containing multiple units (quantity >= 2)?
+
+WITH category_line_metrics AS (
+    SELECT p.category,
+           COUNT(*) AS purchase_lines,
+           SUM(CASE WHEN pl.quantity >= 2 THEN 1 ELSE 0 END)
+               AS multi_unit_lines,
+           SUM(pl.quantity) AS units_purchased
+    FROM purchase_line pl
+    JOIN product p
+        ON p.asin = pl.asin
+    WHERE pl.order_date BETWEEN '2018-01-01' AND '2022-10-31'
+      AND pl.quantity > 0
+      AND p.category IS NOT NULL
+      AND p.category NOT LIKE '%GIFT_CARD%'
+    GROUP BY p.category
+),
+eligible_categories AS (
+    SELECT category,
+           purchase_lines,
+           multi_unit_lines,
+           units_purchased,
+           100.0 * multi_unit_lines / purchase_lines AS multi_unit_pct
+    FROM category_line_metrics
+    WHERE purchase_lines >= 500
+)
+SELECT DENSE_RANK() OVER (
+           ORDER BY multi_unit_pct DESC
+       ) AS category_rank,
+       category,
+       purchase_lines,
+       multi_unit_lines,
+       units_purchased,
+       ROUND(multi_unit_pct, 1) AS multi_unit_purchase_line_pct
+FROM eligible_categories
+ORDER BY category_rank, category
+LIMIT 15;
+
+
 -- @Q26 | Kashif | Advanced | VIEW + 5-table JOIN + conditional aggregation
 -- BUSINESS QUESTION: How often are shipments sent outside the customer's
 -- CURRENT state of residence, by the customer's home Census region?
